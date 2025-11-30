@@ -1,20 +1,22 @@
-import React, { createContext, useCallback, useContext, useState, ReactNode } from "react";
+// src/App.tsx
+import React, { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 import { Routes, Route, Link, useNavigate, useParams } from "react-router-dom";
+import { FiLogOut, FiUser, FiPlus, FiCalendar, FiEdit2, FiTrash2, FiClock } from "react-icons/fi";
+import { HiOutlineUsers } from "react-icons/hi";
 import api from "./lib/api";
 
-/* =======================================================
-   ALERT SYSTEM (toasts + confirm modal) – in-file
-   ======================================================= */
+/* ---------------------------
+   Profile context (open drawer)
+   --------------------------- */
+const ProfileContext = createContext<{ open: () => void }>({ open: () => {} });
+export const useProfile = () => useContext(ProfileContext);
+
+/* ==========================
+   Alerts (top-centered toasts + confirm modal)
+   ========================== */
 
 type ToastType = "success" | "error" | "info" | "warning";
-
-type ToastItem = {
-  id: string;
-  type?: ToastType;
-  title?: string;
-  message: string;
-  timeout?: number | null;
-};
+type ToastItem = { id: string; type?: ToastType; title?: string; message: string; timeout?: number | null };
 
 type ConfirmPayload = {
   id: string;
@@ -47,7 +49,7 @@ function AlertsProvider({ children }: { children: ReactNode }) {
     const item: ToastItem = { id, ...payload };
     setToasts((s) => [item, ...s]);
     if (payload.timeout !== null) {
-      const t = payload.timeout ?? 4000;
+      const t = payload.timeout ?? 3000;
       setTimeout(() => setToasts((s) => s.filter((x) => x.id !== id)), t);
     }
     return id;
@@ -72,52 +74,46 @@ function AlertsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  function iconForType(t?: ToastType) {
+    if (t === "success") return "✔️";
+    if (t === "error") return "❌";
+    if (t === "warning") return "⚠️";
+    return "ℹ️";
+  }
+
   return (
     <AlertsContext.Provider value={{ showToast, hideToast, confirm }}>
       {children}
 
-      {/* Toast container (top-right) */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-3 w-full max-w-sm px-4 sm:px-0">
-        {toasts.map((t) => (
-          <div key={t.id} className="w-full bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-black/5 overflow-hidden animate-in slide-in-from-right duration-300">
-            <div className={`p-4 flex items-start gap-3`}>
-              <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-lg">
-                {t.type === "success" && "✅"}
-                {t.type === "error" && "❌"}
-                {t.type === "warning" && "⚠️"}
-                {!t.type && "ℹ️"}
+      {/* Toasts top-center */}
+      <div className="fixed inset-x-0 top-4 z-50 pointer-events-none flex justify-center items-start px-4">
+        <div className="w-full max-w-lg pointer-events-auto space-y-3">
+          {toasts.map((t) => (
+            <div key={t.id} className="rounded-2xl shadow-lg bg-white/95 border border-gray-100 p-3 flex items-start gap-3 min-w-0">
+              <div className="text-xl flex items-center justify-center w-10 h-10 rounded-lg bg-gray-50 text-gray-700 shrink-0">
+                {iconForType(t.type)}
               </div>
               <div className="flex-1 min-w-0">
-                {t.title && <div className="font-bold text-sm mb-1">{t.title}</div>}
-                <div className="text-xs text-gray-700">{t.message}</div>
+                {t.title && <div className="text-sm font-semibold text-gray-800 truncate">{t.title}</div>}
+                <div className="text-sm text-gray-700 truncate">{t.message}</div>
               </div>
-              <button onClick={() => hideToast(t.id)} className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors font-bold text-lg leading-none">×</button>
+              <button onClick={() => hideToast(t.id)} className="text-gray-400 ml-2">✕</button>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {/* Confirm modal */}
+      {/* Confirm modal centered */}
       {confirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
             <div className="p-6">
-              {confirmModal.title && <div className="font-bold text-xl mb-3">{confirmModal.title}</div>}
-              <div className="text-sm text-gray-700 leading-relaxed">{confirmModal.message}</div>
-            </div>
-            <div className="flex gap-3 p-4 bg-gray-50 border-t border-gray-100">
-              <Button
-                onClick={() => confirmModal.resolve(false)}
-                variant="ghost"
-              >
-                {confirmModal.cancelLabel}
-              </Button>
-              <Button
-                onClick={() => confirmModal.resolve(true)}
-                variant="danger"
-              >
-                {confirmModal.okLabel}
-              </Button>
+              {confirmModal.title && <div className="text-lg font-bold mb-2">{confirmModal.title}</div>}
+              <div className="text-sm text-gray-700 mb-4">{confirmModal.message}</div>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => confirmModal.resolve(false)} className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-sm"> {confirmModal.cancelLabel} </button>
+                <button onClick={() => confirmModal.resolve(true)} className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm"> {confirmModal.okLabel} </button>
+              </div>
             </div>
           </div>
         </div>
@@ -126,9 +122,31 @@ function AlertsProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/* =======================================================
-   Helpers & utils
-   ======================================================= */
+/* ==========================
+   Helpers (date/time conversion + utils)
+   ========================== */
+
+function isoToLocalInput(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const tzOffset = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - tzOffset * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function localInputToIso(local?: string | null) {
+  if (!local) return null;
+  const d = new Date(local);
+  return d.toISOString();
+}
+
+function nowLocalMin() {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  const tzOffset = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - tzOffset * 60000);
+  return local.toISOString().slice(0, 16);
+}
 
 function getUserIdFromToken() {
   try {
@@ -141,85 +159,130 @@ function getUserIdFromToken() {
   }
 }
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+function computeStatusFromDates(start?: string | null, end?: string | null) {
+  if (!start && !end) return "En attente";
+  const now = Date.now();
+  const s = start ? new Date(start).getTime() : null;
+  const e = end ? new Date(end).getTime() : null;
+
+  if (s && now < s) return "En attente";
+  if (e && now >= e) return "Terminée";
+  if (s && e && now >= s && now < e) return "En cours";
+  if (s && !e && now >= s) return "En cours";
+  if (!s && e && now < e) return "En cours";
+  return "En attente";
 }
 
-/* =======================================================
-   UI components reused
-   ======================================================= */
+function sortByCreatedDesc<T extends { createdAt?: string; created_at?: string }>(arr: T[]) {
+  return (arr || []).slice().sort((a, b) => {
+    const ta = new Date(a.createdAt ?? a.created_at ?? 0).getTime();
+    const tb = new Date(b.createdAt ?? b.created_at ?? 0).getTime();
+    return tb - ta;
+  });
+}
 
-function Logo() {
+/* ==========================
+   UI primitives
+   ========================== */
+
+function IconAvatar({ children, onClick }: { children?: ReactNode; onClick?: () => void }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-extrabold shadow-lg shadow-indigo-500/50 transition-transform hover:scale-105">TU</div>
-      <div className="leading-tight">
-        <div className="font-bold text-gray-900 text-lg">TâcheUnie</div>
-        <div className="text-xs text-gray-500 -mt-0.5">Organise. Collabore. Avance.</div>
-      </div>
-    </div>
+    <button onClick={onClick} className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 text-white flex items-center justify-center shadow">
+      {children || <FiUser />}
+    </button>
   );
 }
 
-function Button({ children, onClick, variant = "primary", type = "button" }: { children: any; onClick?: () => void; variant?: "primary" | "ghost" | "danger"; type?: "button" | "submit" }) {
-  const base = "px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 active:scale-95";
-  const classes: Record<string, string> = {
-    primary: base + " bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/40 focus:ring-indigo-500",
-    ghost: base + " bg-white border-2 border-gray-200 text-gray-700 hover:border-indigo-300 hover:bg-indigo-50 focus:ring-indigo-500",
-    danger: base + " bg-gradient-to-r from-red-500 to-pink-600 text-white shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 focus:ring-red-500",
+function Badge({ children, color = "green" }: { children: any; color?: "green" | "yellow" | "gray" }) {
+  const map: Record<string, string> = {
+    green: "bg-emerald-50 text-emerald-700",
+    yellow: "bg-yellow-50 text-yellow-700",
+    gray: "bg-gray-100 text-gray-700",
   };
-  return <button type={type} onClick={onClick} className={classes[variant]}>{children}</button>;
+  return <span className={`px-3 py-1 rounded-full text-xs font-medium ${map[color]}`}>{children}</span>;
 }
 
-/* =======================================================
-   Auth layouts / pages
-   ======================================================= */
+function Header({ onLogout }: { onLogout: () => void }) {
+  const profile = useProfile();
+  return (
+    <header className="flex flex-wrap items-center justify-between py-4 px-2">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-green-400 flex items-center justify-center text-white text-xl font-extrabold shadow">TU</div>
+        <div className="min-w-0">
+          <div className="text-lg font-bold truncate">TâcheUnie</div>
+          <div className="text-xs text-gray-500 truncate">Organise. Collabore. Avance.</div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 ml-2">
+        <div className="hidden sm:flex items-center gap-4 bg-white/80 border border-gray-100 rounded-2xl px-3 py-2 shadow-sm">
+          <Link to="/dashboard" className="text-sm text-gray-700 hover:text-green-700">Tableau de bord</Link>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button className="hidden md:inline-flex items-center gap-2 text-sm py-2 px-3 rounded-lg bg-white border border-gray-100 shadow-sm">
+            <FiCalendar /> Aujourd'hui
+          </button>
+
+          <div className="relative">
+            <IconAvatar onClick={() => profile.open()} />
+          </div>
+
+          <button onClick={onLogout} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-white border border-gray-100 shadow-sm">
+            <FiLogOut /> <span className="hidden sm:inline">Déconnexion</span>
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/* ==========================
+   Auth pages
+   ========================== */
 
 function AuthLayout({ children }: { children: any }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-4 sm:p-6">
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-        <div className="hidden lg:flex flex-col gap-6 p-10 rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white shadow-2xl relative overflow-hidden">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00eiIvPjwvZz48L2c+PC9zdmc+')] opacity-20"></div>
-          <div className="relative z-10">
-            <Logo />
-            <h2 className="text-4xl font-bold mt-8 leading-tight">Organise tes tâches.<br/>Collabore mieux.</h2>
-            <p className="opacity-90 text-lg mt-4">Application moderne pour gérer utilisateurs, groupes et tâches — responsive & élégante.</p>
-            <div className="mt-12 flex items-center gap-3 text-sm opacity-90">
-              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">📱</div>
-              <span>Disponible sur mobile et desktop</span>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-green-25 p-4">
+      <div className="w-full max-w-3xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center px-4 sm:px-6">
+        <div className="hidden md:flex flex-col gap-6 p-8 rounded-3xl bg-gradient-to-br from-emerald-600 to-emerald-400 text-white shadow-2xl">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white font-extrabold">TU</div>
+            <div>
+              <div className="font-bold text-lg">TâcheUnie</div>
+              <div className="text-xs opacity-90">Organise. Collabore. Avance.</div>
             </div>
           </div>
+          <h2 className="text-3xl font-bold">Organise tes tâches. Collabore mieux.</h2>
+          <p className="opacity-90">Application simple pour gérer utilisateurs, groupes et tâches — responsive & moderne.</p>
+          <div className="mt-auto small">Disponible sur mobile et desktop</div>
         </div>
 
-        <div className="bg-white/80 backdrop-blur-xl p-6 sm:p-8 rounded-3xl shadow-2xl border border-white/20">{children}</div>
-        
-        <div className="lg:hidden text-center">
-          <Logo />
-        </div>
+        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md">{children}</div>
       </div>
     </div>
   );
 }
+
+/* ==========================
+   Login / Register (unchanged)
+   ========================== */
 
 function Login() {
   const [fullname, setFullname] = useState("");
   const [password, setPassword] = useState("");
-  const [err, setErr] = useState("");
   const nav = useNavigate();
   const alerts = useAlerts();
 
   async function submit(e: any) {
     e.preventDefault();
-    setErr("");
     try {
       const res = await api.post("/auth/login", { fullname, password });
       localStorage.setItem("token", res.data.token);
+      alerts.showToast({ type: "success", title: "Connecté", message: "Bienvenue !", timeout: 2000 });
       nav("/dashboard");
-      alerts.showToast({ type: "success", title: "Connecté", message: "Bienvenue !", timeout: 2500 });
     } catch (err: any) {
-      setErr(err?.response?.data?.message || "Erreur");
-      alerts.showToast({ type: "error", title: "Erreur", message: err?.response?.data?.message || "Impossible de se connecter" });
+      alerts.showToast({ type: "error", title: "Erreur", message: err?.response?.data?.message || "Impossible de se connecter", timeout: 4000 });
     }
   }
 
@@ -227,21 +290,23 @@ function Login() {
     <AuthLayout>
       <form onSubmit={submit} className="space-y-5">
         <div>
-          <h3 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Se connecter</h3>
-          <p className="text-sm text-gray-600 mt-2">Bon retour parmi nous ! 👋</p>
+          <h3 className="text-3xl font-bold text-gray-900">Se connecter</h3>
+          <p className="text-sm text-gray-600 mt-1">Bon retour parmi nous 👋</p>
         </div>
-        {err && <div className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-xl">{err}</div>}
-        <div className="space-y-2">
+
+        <div>
           <label className="text-sm font-medium text-gray-700">Nom complet</label>
-          <input className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all" value={fullname} onChange={(e) => setFullname(e.target.value)} placeholder="Ton nom complet" />
+          <input required value={fullname} onChange={(e) => setFullname(e.target.value)} className="w-full mt-2 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-emerald-400 outline-none" placeholder="Ton nom complet" />
         </div>
-        <div className="space-y-2">
+
+        <div>
           <label className="text-sm font-medium text-gray-700">Mot de passe</label>
-          <input type="password" className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+          <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full mt-2 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-emerald-400 outline-none" placeholder="••••••••" />
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-2">
-          <Button type="submit">Se connecter</Button>
-          <Link to="/register" className="text-sm text-center sm:text-left text-indigo-600 hover:text-purple-600 font-medium transition-colors">Pas de compte ? Inscris-toi</Link>
+
+        <div className="flex items-center justify-between gap-4">
+          <button type="submit" className="px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold">Se connecter</button>
+          <Link to="/register" className="text-sm text-emerald-600">Pas de compte ? S'inscrire</Link>
         </div>
       </form>
     </AuthLayout>
@@ -251,20 +316,16 @@ function Login() {
 function Register() {
   const [fullname, setFullname] = useState("");
   const [password, setPassword] = useState("");
-  const [msg, setMsg] = useState("");
   const nav = useNavigate();
   const alerts = useAlerts();
 
   async function submit(e: any) {
     e.preventDefault();
-    setMsg("");
     try {
       await api.post("/auth/register", { fullname, password });
-      setMsg("Compte créé — connecte-toi");
       alerts.showToast({ type: "success", title: "Compte créé", message: "Tu peux maintenant te connecter", timeout: 3000 });
-      setTimeout(() => nav("/"), 800);
+      setTimeout(() => nav("/"), 700);
     } catch (err: any) {
-      setMsg(err?.response?.data?.message || "Erreur");
       alerts.showToast({ type: "error", title: "Erreur", message: err?.response?.data?.message || "Impossible de créer le compte" });
     }
   }
@@ -273,42 +334,32 @@ function Register() {
     <AuthLayout>
       <form onSubmit={submit} className="space-y-5">
         <div>
-          <h3 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Créer un compte</h3>
-          <p className="text-sm text-gray-600 mt-2">Rejoins-nous dès maintenant ! 🚀</p>
+          <h3 className="text-3xl font-bold text-gray-900">Créer un compte</h3>
+          <p className="text-sm text-gray-600 mt-1">Rejoins-nous dès maintenant ! 🚀</p>
         </div>
-        {msg && <div className="text-sm text-green-600 bg-green-50 px-4 py-3 rounded-xl">{msg}</div>}
-        <div className="space-y-2">
+
+        <div>
           <label className="text-sm font-medium text-gray-700">Nom complet</label>
-          <input className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all" value={fullname} onChange={(e) => setFullname(e.target.value)} placeholder="Ton nom complet" />
+          <input required value={fullname} onChange={(e) => setFullname(e.target.value)} className="w-full mt-2 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-emerald-400 outline-none" placeholder="Ton nom complet" />
         </div>
-        <div className="space-y-2">
+
+        <div>
           <label className="text-sm font-medium text-gray-700">Mot de passe</label>
-          <input type="password" className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+          <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full mt-2 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-emerald-400 outline-none" placeholder="••••••••" />
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-2">
-          <Button type="submit">S'inscrire</Button>
-          <Link to="/" className="text-sm text-center sm:text-left text-indigo-600 hover:text-purple-600 font-medium transition-colors">Déjà inscrit ? Se connecter</Link>
+
+        <div className="flex items-center justify-between gap-4">
+          <button type="submit" className="px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold">S'inscrire</button>
+          <Link to="/" className="text-sm text-emerald-600">Déjà inscrit ? Se connecter</Link>
         </div>
       </form>
     </AuthLayout>
   );
 }
 
-/* =======================================================
-   Header / Dashboard / GroupPage
-   ======================================================= */
-
-function Header({ onLogout }: { onLogout: () => void }) {
-  return (
-    <header className="flex items-center justify-between py-4 px-2">
-      <Logo />
-      <div className="flex items-center gap-2 sm:gap-3">
-        <Link to="/dashboard" className="hidden sm:inline text-sm font-medium text-gray-600 hover:text-indigo-600 transition-colors">Tableau de bord</Link>
-        <button onClick={onLogout} className="px-3 sm:px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm font-medium transition-all active:scale-95">Logout</button>
-      </div>
-    </header>
-  );
-}
+/* ==========================
+   Dashboard & PersonalTasksBlock
+   ========================== */
 
 function Dashboard() {
   const [groups, setGroups] = useState<any[]>([]);
@@ -317,59 +368,38 @@ function Dashboard() {
   const nav = useNavigate();
   const alerts = useAlerts();
 
-  React.useEffect(() => { fetchGroups(); }, []);
+  useEffect(() => { fetchGroups(); }, []);
 
   async function fetchGroups() {
     try {
       const res = await api.get("/groups");
-      setGroups(res.data);
+      setGroups(sortByCreatedDesc(res.data || []));
     } catch (err: any) {
-      if (err?.response?.status === 401) {
-        localStorage.removeItem("token");
-        nav("/");
-        return;
-      }
-      alerts.showToast({ type: "error", title: "Erreur", message: "Impossible de charger les groupes" });
-      console.error(err);
+      if (err?.response?.status === 401) { localStorage.removeItem("token"); nav("/"); return; }
+      alerts.showToast({ type: "error", message: "Impossible de charger les groupes" });
     }
   }
 
   async function create() {
-    if (!name) {
-      alerts.showToast({ type: "info", message: "Donne un nom au groupe" });
-      return;
-    }
+    if (!name) { alerts.showToast({ type: "info", message: "Donne un nom au groupe" }); return; }
     try {
       const res = await api.post("/groups", { name });
-      setGroups((prev) => [res.data, ...prev]);
+      setGroups((prev) => sortByCreatedDesc([res.data, ...prev]));
       setName("");
       alerts.showToast({ type: "success", message: "Groupe créé" });
     } catch (err: any) {
-      if (err?.response?.status === 401) {
-        localStorage.removeItem("token");
-        nav("/");
-        return;
-      }
-      alerts.showToast({ type: "error", title: "Erreur", message: err?.response?.data?.message || "Impossible de créer le groupe" });
+      alerts.showToast({ type: "error", message: err?.response?.data?.message || "Erreur création groupe" });
     }
   }
 
   async function join() {
-    if (!joinCode) {
-      alerts.showToast({ type: "info", message: "Entrer un code d'invitation" });
-      return;
-    }
+    if (!joinCode) { alerts.showToast({ type: "info", message: "Entre un code" }); return; }
     try {
       const res = await api.post("/groups/join", { code: joinCode });
-      setGroups((prev) => [res.data, ...prev.filter(g => String(g._id) !== String(res.data._id))]);
+      setGroups((prev) => sortByCreatedDesc([res.data, ...prev.filter(g => String(g._id) !== String(res.data._id))]));
       setJoinCode("");
       alerts.showToast({ type: "success", message: "Groupe rejoint" });
     } catch (err: any) {
-      if (err?.response?.status === 401) {
-        localStorage.removeItem("token");
-        nav("/");
-        return;
-      }
       alerts.showToast({ type: "error", message: err?.response?.data?.message || "Erreur" });
     }
   }
@@ -380,80 +410,302 @@ function Dashboard() {
   const userId = getUserIdFromToken();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-4 sm:py-8">
-      <div className="max-w-7xl mx-auto px-4">
+    <div className="min-h-screen w-full bg-gradient-to-br from-emerald-50 via-white to-emerald-25 py-6">
+      <div className="w-full max-w-full sm:max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <Header onLogout={logout} />
-        
-        <div className="mt-6 sm:mt-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <div>
-              <h2 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">Mes groupes</h2>
-              <p className="text-sm text-gray-600 mt-1">Organise et collabore avec ton équipe</p>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div className="lg:col-span-3 space-y-6">
-              <div className="bg-white/80 backdrop-blur-xl p-4 sm:p-6 rounded-2xl shadow-xl border border-white/20">
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <input className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all" placeholder="Nom du groupe" value={name} onChange={(e) => setName(e.target.value)} />
-                    <Button onClick={create}>➕ Créer</Button>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <input className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all" placeholder="Code d'invitation" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} />
-                    <Button onClick={join} variant="ghost">🔗 Rejoindre</Button>
-                  </div>
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3 space-y-6">
+            <div className="p-4 sm:p-6 rounded-2xl bg-white shadow-lg border border-gray-50">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex gap-3 min-w-0">
+                  <input className="flex-1 px-4 py-3 rounded-xl border border-gray-200 min-w-0" placeholder="Nom du groupe" value={name} onChange={(e) => setName(e.target.value)} />
+                  <button onClick={create} className="px-4 py-3 rounded-xl bg-emerald-600 text-white flex items-center gap-2 flex-shrink-0">
+                    <span className="hidden sm:inline-flex"><FiPlus /></span>
+                    <span>Créer</span>
+                  </button>
+                </div>
+
+                <div className="flex gap-3 min-w-0">
+                  <input className="flex-1 px-4 py-3 rounded-xl border border-gray-200 min-w-0" placeholder="Code d'invitation" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} />
+                  <button onClick={join} className="px-4 py-3 rounded-xl border border-gray-200 bg-white text-emerald-600 flex-shrink-0">Rejoindre</button>
                 </div>
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {groups.length === 0 && (
-                  <div className="col-span-full p-12 rounded-2xl bg-white/60 backdrop-blur-xl border-2 border-dashed border-gray-300 text-center">
-                    <div className="text-4xl mb-3">📋</div>
-                    <div className="font-semibold text-gray-700">Aucun groupe pour le moment</div>
-                    <div className="text-sm text-gray-500 mt-1">Crée ton premier groupe pour commencer</div>
-                  </div>
-                )}
-                {groups.map((g) => {
-                  const ownerId = g.owner ? (g.owner._id || g.owner) : (Array.isArray(g.members) ? g.members[0] : null);
-                  const isOwner = String(ownerId) === String(userId);
-                  return (
-                    <div key={g.id || g._id} className="group p-5 rounded-2xl bg-white/80 backdrop-blur-xl shadow-lg hover:shadow-2xl border border-white/20 cursor-pointer transition-all duration-300 hover:scale-105 active:scale-95" onClick={() => open(g)}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-bold text-lg text-gray-900 truncate group-hover:text-indigo-600 transition-colors">{g.name}</div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <div className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">👥 {g.members ? g.members.length : 1} membres</div>
-                            {isOwner && <div className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">👑 Owner</div>}
-                          </div>
-                        </div>
-                        <div className="text-xs font-mono text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">{g.inviteCode || "—"}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {groups.length === 0 && (
+                <div className="col-span-full p-6 rounded-2xl bg-white border-dashed border-2 border-gray-200 text-center">
+                  <div className="text-lg sm:text-xl font-semibold">Aucun groupe — crée le premier</div>
+                </div>
+              )}
+
+              {groups.map((g) => {
+                const ownerId = g.owner ? (g.owner._id || g.owner) : (Array.isArray(g.members) ? g.members[0] : null);
+                const isOwner = String(ownerId) === String(userId);
+                return (
+                  <div key={g._id || g.id} className="p-4 rounded-2xl bg-white shadow-sm cursor-pointer hover:shadow-md flex flex-col justify-between min-h-[110px] w-full" onClick={() => open(g)}>
+                    <div>
+                      <div className="font-semibold text-lg truncate">{g.name}</div>
+                      <div className="text-sm text-gray-500 mt-2 flex items-center gap-3">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-50 text-xs"><HiOutlineUsers /> {g.members ? g.members.length : 1} membres</span>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="text-xs font-mono text-gray-400 bg-gray-50 px-2 py-1 rounded-lg truncate">{g.inviteCode || "—"}</div>
+                      {isOwner && <div className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">Propriétaire</div>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            <aside className="hidden lg:block">
-              <div className="sticky top-6 p-6 rounded-2xl bg-white/80 backdrop-blur-xl shadow-xl border border-white/20">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="text-2xl">💡</div>
-                  <h4 className="font-bold text-lg">Raccourcis</h4>
-                </div>
-                <p className="text-sm text-gray-600 leading-relaxed">Crée un groupe pour inviter d'autres utilisateurs via le code d'invitation unique.</p>
-                <div className="mt-6 space-y-2">
-                  <Link to="#" className="block text-sm font-medium text-indigo-600 hover:text-purple-600 transition-colors">→ Gérer les invitations</Link>
+          </div>
+
+          <aside className="hidden lg:block">
+            <div className="sticky top-6 p-4 sm:p-6 rounded-2xl bg-white shadow-lg border border-gray-50 w-full">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700">💡</div>
+                <div>
+                  <div className="font-semibold">Raccourcis</div>
+                  <div className="text-sm text-gray-600">Partage le code d'invitation pour inviter des membres.</div>
                 </div>
               </div>
-            </aside>
+              <Link to="#" className="text-sm text-emerald-600 font-medium">→ Gérer les invitations</Link>
+            </div>
+          </aside>
+        </div>
+
+        {/* Personal tasks area */}
+        <div className="mt-8 p-4 sm:p-6 rounded-2xl bg-white shadow-lg border border-gray-50">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold">Tâches personnelles</h3>
+            <div className="text-sm text-gray-500">Gère tes tâches hors groupes</div>
           </div>
+
+          <PersonalTasksBlock />
         </div>
       </div>
     </div>
   );
 }
+
+/* ==========================
+   Personal Tasks Block (create/edit/delete personal tasks)
+   ========================== */
+
+function PersonalTasksBlock() {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editStart, setEditStart] = useState("");
+  const [editEnd, setEditEnd] = useState("");
+
+  const nav = useNavigate();
+  const alerts = useAlerts();
+
+  useEffect(() => { fetchPersonalTasks(); }, []);
+
+  async function fetchPersonalTasks() {
+    try {
+      const res = await api.get("/tasks");
+      const personal = (res.data || []).filter((t: any) => !t.groupId);
+      setTasks(sortByCreatedDesc(personal));
+    } catch (err: any) {
+      if (err?.response?.status === 401) { localStorage.removeItem("token"); nav("/"); return; }
+      alerts.showToast({ type: "error", message: "Impossible de charger les tâches" });
+    }
+  }
+
+  function validateNotPastLocal(localValue?: string) {
+    if (!localValue) return true;
+    const given = new Date(localValue);
+    return given.getTime() >= Date.now();
+  }
+
+  async function addTask() {
+    if (!title) { alerts.showToast({ type: "info", message: "Titre requis" }); return; }
+    if (startDate && !validateNotPastLocal(startDate)) { alerts.showToast({ type: "error", message: "La date/heure de début ne peut pas être passée" }); return; }
+    if (endDate && startDate && new Date(endDate).getTime() < new Date(startDate).getTime()) { alerts.showToast({ type: "error", message: "La date/heure de fin doit être après la date de début" }); return; }
+
+    try {
+      const payload: any = { title, description };
+      if (startDate) payload.startDate = localInputToIso(startDate);
+      if (endDate) payload.endDate = localInputToIso(endDate);
+      const res = await api.post("/tasks", payload);
+      setTasks(prev => sortByCreatedDesc([res.data, ...prev]));
+      setTitle(""); setDescription(""); setStartDate(""); setEndDate("");
+      alerts.showToast({ type: "success", message: "Tâche personnelle ajoutée" });
+    } catch (err: any) {
+      if (err?.response?.status === 401) { localStorage.removeItem("token"); nav("/"); return; }
+      alerts.showToast({ type: "error", message: err?.response?.data?.message || "Erreur création tâche" });
+    }
+  }
+
+  async function deleteTask(id: string) {
+    const ok = await alerts.confirm({ message: "Supprimer cette tâche personnelle ?", okLabel: "Supprimer", cancelLabel: "Annuler" });
+    if (!ok) return;
+    try {
+      await api.delete(`/tasks/${id}`);
+      setTasks(prev => prev.filter(t => String(t._id || t.id) !== String(id)));
+      alerts.showToast({ type: "success", message: "Tâche supprimée" });
+    } catch (err: any) {
+      alerts.showToast({ type: "error", message: err?.response?.data?.message || "Erreur suppression" });
+    }
+  }
+
+  function beginEdit(t: any) {
+    const tid = t._id || t.id;
+    setEditingId(tid);
+    setEditTitle(t.title || "");
+    setEditDescription(t.description || "");
+    setEditStart(isoToLocalInput(t.startDate));
+    setEditEnd(isoToLocalInput(t.endDate));
+  }
+
+  async function saveEdit() {
+    if (!editingId) return;
+    if (editStart && !validateNotPastLocal(editStart)) { alerts.showToast({ type: "error", message: "La date/heure de début ne peut pas être passée" }); return; }
+    if (editStart && editEnd && new Date(editEnd).getTime() < new Date(editStart).getTime()) { alerts.showToast({ type: "error", message: "La date/heure de fin doit être après la date de début" }); return; }
+
+    try {
+      const payload: any = { title: editTitle, description: editDescription };
+      if (editStart) payload.startDate = localInputToIso(editStart); else payload.startDate = null;
+      if (editEnd) payload.endDate = localInputToIso(editEnd); else payload.endDate = null;
+
+      const res = await api.put(`/tasks/${editingId}`, payload);
+      setTasks(prev => sortByCreatedDesc(prev.map(t => (String(t._id || t.id) === String(editingId) ? res.data : t))));
+      setEditingId(null); setEditTitle(""); setEditDescription(""); setEditStart(""); setEditEnd("");
+      alerts.showToast({ type: "success", message: "Tâche mise à jour" });
+    } catch (err: any) {
+      alerts.showToast({ type: "error", message: err?.response?.data?.message || "Erreur mise à jour" });
+    }
+  }
+
+  return (
+    <>
+      {/* stacked title and description; dates + add button on next row (responsive) */}
+      <div className="space-y-3">
+        <div>
+          <label className="text-sm font-medium text-gray-700 block mb-1">Titre</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 min-w-0 box-border"
+            placeholder="Titre"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700 block mb-1">Description</label>
+          <input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 min-w-0 box-border"
+            placeholder="Description"
+          />
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="flex items-center gap-2 w-full sm:max-w-[640px]">
+            <label className="text-xs text-gray-600 mr-2 hidden sm:inline">Début</label>
+            <input
+              type="datetime-local"
+              min={nowLocalMin()}
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-gray-200 w-full min-w-0 box-border pr-10"
+            />
+            <label className="text-xs text-gray-600 ml-3 mr-2 hidden sm:inline">Fin</label>
+            <input
+              type="datetime-local"
+              min={nowLocalMin()}
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-gray-200 w-full min-w-0 box-border pr-10"
+            />
+          </div>
+
+          <div className="w-full sm:w-auto flex justify-end">
+            <button
+              onClick={addTask}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 text-white flex-shrink-0"
+              aria-label="Ajouter une tâche"
+            >
+              <span className="hidden sm:inline-flex"><FiPlus /></span>
+              <span>Ajouter</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3 mt-4">
+        {tasks.length === 0 && <div className="rounded-xl p-6 bg-gray-50 text-center text-gray-600">Aucune tâche personnelle</div>}
+
+        {tasks.map(t => {
+          const tid = t._id || t.id;
+          const status = computeStatusFromDates(t.startDate, t.endDate);
+          const statusColor = status === "En cours" ? "bg-emerald-50 text-emerald-700" : status === "Terminée" ? "bg-gray-100 text-gray-700" : "bg-yellow-50 text-yellow-800";
+          const startLabel = t.startDate ? new Date(t.startDate).toLocaleString() : "—";
+          const endLabel = t.endDate ? new Date(t.endDate).toLocaleString() : "—";
+          return (
+            <div key={tid} className="p-4 rounded-2xl bg-white shadow-sm border border-gray-50 flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-lg truncate">{t.title}</div>
+                <div className="text-sm text-gray-600 mt-1 truncate">{t.description}</div>
+                <div className="flex items-center gap-3 mt-3 text-xs text-gray-500 flex-wrap">
+                  <div className="flex items-center gap-2"><FiClock /> Début: {startLabel}</div>
+                  <div className="flex items-center gap-2"><FiCalendar /> Fin: {endLabel}</div>
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>{status}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 ml-4">
+                <button onClick={() => beginEdit(t)} className="p-2 rounded-lg bg-white border border-gray-100"><FiEdit2 /></button>
+                <button onClick={() => deleteTask(tid)} className="p-2 rounded-lg bg-red-50 text-red-600"><FiTrash2 /></button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Inline edit panel */}
+      {editingId && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-60 w-full max-w-3xl p-4 bg-white rounded-2xl shadow-2xl border border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <div className="font-semibold">Modifier la tâche</div>
+            <div className="flex gap-2">
+              <button onClick={() => { setEditingId(null); }} className="px-3 py-2 rounded-lg border">Annuler</button>
+              <button onClick={saveEdit} className="px-3 py-2 rounded-lg bg-emerald-600 text-white">Enregistrer</button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="px-4 py-3 rounded-xl border border-gray-200 col-span-2 min-w-0" placeholder="Titre" />
+            <input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="px-4 py-3 rounded-xl border border-gray-200 col-span-2 min-w-0" placeholder="Description" />
+            <div className="flex items-center gap-2">
+              <div className="text-xs text-gray-600 mr-2">Début</div>
+              <input type="datetime-local" min={nowLocalMin()} value={editStart} onChange={(e) => setEditStart(e.target.value)} className="px-3 py-2 rounded-xl border border-gray-200" />
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-xs text-gray-600 mr-2">Fin</div>
+              <input type="datetime-local" min={nowLocalMin()} value={editEnd} onChange={(e) => setEditEnd(e.target.value)} className="px-3 py-2 rounded-xl border border-gray-200" />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ==========================
+   Group page
+   ========================== */
 
 function GroupPage() {
   const { id } = useParams();
@@ -461,22 +713,17 @@ function GroupPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
-  const [deadline, setDeadline] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
-  const [editDeadline, setEditDeadline] = useState("");
+  const [editStart, setEditStart] = useState("");
+  const [editEnd, setEditEnd] = useState("");
   const nav = useNavigate();
-
   const alerts = useAlerts();
 
-  React.useEffect(() => {
-    if (id) {
-      fetchGroup();
-      fetchTasks();
-    }
-    // eslint-disable-next-line
-  }, [id]);
+  useEffect(() => { if (id) { fetchGroup(); fetchTasks(); } }, [id]);
 
   async function fetchGroup() {
     try {
@@ -485,41 +732,38 @@ function GroupPage() {
     } catch (err: any) {
       if (err?.response?.status === 401) { localStorage.removeItem("token"); nav("/"); return; }
       alerts.showToast({ type: "error", message: "Impossible de charger le groupe" });
-      console.error(err);
     }
   }
 
   async function fetchTasks() {
     try {
       const res = await api.get(`/tasks/group/${id}`);
-      setTasks(res.data);
+      setTasks(sortByCreatedDesc(res.data || []));
     } catch (err: any) {
-      if (err?.response?.status === 401) { localStorage.removeItem("token"); nav("/"); return; }
       alerts.showToast({ type: "error", message: "Impossible de charger les tâches" });
-      console.error(err);
     }
   }
 
-  function validateDateNotPast(d: string) {
-    if (!d) return true;
-    const given = new Date(d); given.setHours(0, 0, 0, 0);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    return given >= today;
+  function validateDateNotPastLocal(localVal?: string) {
+    if (!localVal) return true;
+    const given = new Date(localVal);
+    return given.getTime() >= Date.now();
   }
 
   async function addTask() {
     if (!title) { alerts.showToast({ type: "info", message: "Titre requis" }); return; }
-    if (deadline && !validateDateNotPast(deadline)) { alerts.showToast({ type: "error", message: "La deadline ne peut pas être dans le passé" }); return; }
+    if (startDate && !validateDateNotPastLocal(startDate)) { alerts.showToast({ type: "error", message: "La date/heure de début ne peut pas être passée" }); return; }
+    if (endDate && startDate && new Date(endDate).getTime() < new Date(startDate).getTime()) { alerts.showToast({ type: "error", message: "La date/heure de fin doit être après la date de début" }); return; }
 
     try {
       const payload: any = { title, description: desc, groupId: id };
-      if (deadline) payload.deadline = new Date(deadline).toISOString();
+      if (startDate) payload.startDate = localInputToIso(startDate);
+      if (endDate) payload.endDate = localInputToIso(endDate);
       const res = await api.post("/tasks", payload);
-      setTasks((prev) => [res.data, ...prev]);
-      setTitle(""); setDesc(""); setDeadline("");
+      setTasks(prev => sortByCreatedDesc([res.data, ...prev]));
+      setTitle(""); setDesc(""); setStartDate(""); setEndDate("");
       alerts.showToast({ type: "success", message: "Tâche ajoutée" });
     } catch (err: any) {
-      if (err?.response?.status === 401) { localStorage.removeItem("token"); nav("/"); return; }
       alerts.showToast({ type: "error", message: err?.response?.data?.message || "Erreur création tâche" });
     }
   }
@@ -529,63 +773,65 @@ function GroupPage() {
     setEditingTaskId(tid);
     setEditTitle(t.title || "");
     setEditDesc(t.description || "");
-    setEditDeadline(t.deadline ? new Date(t.deadline).toISOString().slice(0, 10) : "");
+    setEditStart(isoToLocalInput(t.startDate));
+    setEditEnd(isoToLocalInput(t.endDate));
   }
 
   async function saveEdit() {
     if (!editingTaskId) return;
-    if (editDeadline && !validateDateNotPast(editDeadline)) { alerts.showToast({ type: "error", message: "La deadline ne peut pas être dans le passé" }); return; }
+    if (editStart && !validateDateNotPastLocal(editStart)) { alerts.showToast({ type: "error", message: "La date/heure de début ne peut pas être passée" }); return; }
+    if (editStart && editEnd && new Date(editEnd).getTime() < new Date(editStart).getTime()) { alerts.showToast({ type: "error", message: "La date/heure de fin doit être après la date de début" }); return; }
 
     try {
       const payload: any = { title: editTitle, description: editDesc };
-      if (editDeadline) payload.deadline = new Date(editDeadline).toISOString();
-      else payload.deadline = null;
-      await api.put(`/tasks/${editingTaskId}`, payload);
-      setTasks((prev) => prev.map((t) => (String(t._id || t.id) === String(editingTaskId) ? { ...t, ...payload } : t)));
-      setEditingTaskId(null); setEditTitle(""); setEditDesc(""); setEditDeadline("");
+      if (editStart) payload.startDate = localInputToIso(editStart); else payload.startDate = null;
+      if (editEnd) payload.endDate = localInputToIso(editEnd); else payload.endDate = null;
+
+      const res = await api.put(`/tasks/${editingTaskId}`, payload);
+      setTasks(prev => sortByCreatedDesc(prev.map(t => (String(t._id || t.id) === String(editingTaskId) ? res.data : t))));
+      setEditingTaskId(null); setEditTitle(""); setEditDesc(""); setEditStart(""); setEditEnd("");
       alerts.showToast({ type: "success", message: "Tâche mise à jour" });
     } catch (err: any) {
-      if (err?.response?.status === 401) { localStorage.removeItem("token"); nav("/"); return; }
       alerts.showToast({ type: "error", message: err?.response?.data?.message || "Erreur mise à jour" });
     }
   }
 
   async function deleteTask(idTask: string) {
-    const ok = await alerts.confirm({ message: "Supprimer cette tâche ?" , okLabel: "Supprimer", cancelLabel: "Annuler"});
+    const ok = await alerts.confirm({ message: "Supprimer cette tâche ?", okLabel: "Supprimer", cancelLabel: "Annuler" });
     if (!ok) return;
     try {
       await api.delete(`/tasks/${idTask}`);
-      setTasks((prev) => prev.filter((t) => String(t._id || t.id) !== String(idTask)));
+      setTasks(prev => prev.filter((t: any) => String(t._id || t.id) !== String(idTask)));
       alerts.showToast({ type: "success", message: "Tâche supprimée" });
     } catch (err: any) {
-      if (err?.response?.status === 401) { localStorage.removeItem("token"); nav("/"); return; }
       alerts.showToast({ type: "error", message: err?.response?.data?.message || "Erreur suppression" });
     }
   }
 
   async function deleteGroup() {
-    const ok = await alerts.confirm({ message: "Supprimer ce groupe et toutes ses tâches ?" , okLabel: "Supprimer", cancelLabel: "Annuler"});
+    const ok = await alerts.confirm({ message: "Supprimer ce groupe et toutes ses tâches ?", okLabel: "Supprimer", cancelLabel: "Annuler" });
     if (!ok) return;
     try {
       await api.delete(`/groups/${id}`);
       alerts.showToast({ type: "success", message: "Groupe supprimé" });
       nav("/dashboard");
     } catch (err: any) {
-      if (err?.response?.status === 401) { localStorage.removeItem("token"); nav("/"); return; }
       alerts.showToast({ type: "error", message: err?.response?.data?.message || "Erreur suppression groupe" });
     }
   }
 
   async function removeMember(memberId: string) {
-    const ok = await alerts.confirm({ message: "Retirer ce membre du groupe ?" , okLabel: "Retirer", cancelLabel: "Annuler"});
+    const ok = await alerts.confirm({ message: "Supprimer ce membre du groupe ?", okLabel: "Supprimer", cancelLabel: "Annuler" });
     if (!ok) return;
     try {
       await api.delete(`/groups/${id}/members/${memberId}`);
-      setGroup((g: any) => ({ ...g, members: (g.members || []).filter((m: any) => String((m._id || m) || m) !== String(memberId)) }));
-      alerts.showToast({ type: "success", message: "Membre retiré" });
+      setGroup((g: any) => ({ ...g, members: (g?.members || []).filter((m: any) => {
+        const mid = typeof m === "string" ? m : (m._id || m.id || m);
+        return String(mid) !== String(memberId);
+      }) }));
+      alerts.showToast({ type: "success", message: "Membre supprimé" });
     } catch (err: any) {
-      if (err?.response?.status === 401) { localStorage.removeItem("token"); nav("/"); return; }
-      alerts.showToast({ type: "error", message: err?.response?.data?.message || "Erreur retrait membre" });
+      alerts.showToast({ type: "error", message: err?.response?.data?.message || "Erreur suppression membre" });
     }
   }
 
@@ -593,90 +839,119 @@ function GroupPage() {
   const ownerId = group?.owner ? (group.owner._id || group.owner) : (Array.isArray(group?.members) ? group.members[0] : null);
   const isOwner = String(ownerId) === String(userId);
 
+  async function copyInviteCode() {
+    try {
+      const code = group?.inviteCode || "";
+      if (!code) return alerts.showToast({ type: "info", message: "Aucun code" });
+      await navigator.clipboard.writeText(code);
+      alerts.showToast({ type: "success", message: "Code d'invitation copié" });
+    } catch (e) {
+      alerts.showToast({ type: "error", message: "Impossible de copier le code" });
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-4 sm:py-8">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div className="flex-1 min-w-0">
-            <button onClick={() => nav("/dashboard")} className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-purple-600 transition-colors mb-3">
-              <span>←</span> Retour au tableau de bord
-            </button>
-            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent truncate">{group?.name || "Groupe"}</h1>
-            <div className="flex items-center gap-2 mt-2">
-              <div className="text-xs font-medium text-gray-500 bg-white/80 px-3 py-1.5 rounded-full">Code: {group?.inviteCode || "—"}</div>
-              <div className="text-xs font-medium text-gray-500 bg-white/80 px-3 py-1.5 rounded-full">👥 {group?.members?.length || 0} membres</div>
-            </div>
+    <div className="min-h-screen w-full bg-gradient-to-br from-emerald-50 via-white to-emerald-25 py-6">
+      <div className="w-full max-w-full sm:max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <button onClick={() => nav("/dashboard")} className="text-sm text-emerald-600">◀ Retour</button>
+            <h1 className="text-2xl sm:text-3xl font-bold mt-2">{group?.name || "Groupe"}</h1>
+            <div className="text-sm text-gray-600 mt-1">Code d'invitation: {group?.inviteCode || "—"}</div>
           </div>
-          {isOwner && (
-            <Button variant="danger" onClick={deleteGroup}>🗑 Supprimer</Button>
-          )}
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-gray-600">Membres: {group?.members?.length || 0}</div>
+            {isOwner && <button onClick={deleteGroup} className="px-3 sm:px-4 py-2 sm:py-2 bg-red-500 text-white rounded-lg">Supprimer</button>}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white/80 backdrop-blur-xl p-4 sm:p-6 rounded-2xl shadow-xl border border-white/20">
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <span>✨</span>
-                <span>Nouvelle tâche</span>
-              </h3>
+            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-50">
+              <h3 className="text-lg font-semibold mb-4">Nouvelle tâche</h3>
+
               <div className="space-y-3">
-                <input className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all" placeholder="Titre de la tâche" value={title} onChange={(e) => setTitle(e.target.value)} />
-                <input className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all" placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)} />
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <input type="date" min={todayIso()} className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-                  <Button onClick={addTask}>➕ Ajouter</Button>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1">Titre</label>
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Titre"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 min-w-0 box-border"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1">Description</label>
+                  <input
+                    value={desc}
+                    onChange={(e) => setDesc(e.target.value)}
+                    placeholder="Description"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 min-w-0 box-border"
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <div className="flex items-center gap-2 w-full sm:max-w-[640px]">
+                    <label className="text-xs text-gray-600 mr-2 hidden sm:inline">Début</label>
+                    <input
+                      type="datetime-local"
+                      min={nowLocalMin()}
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-gray-200 w-full min-w-0 box-border pr-10"
+                    />
+
+                    <label className="text-xs text-gray-600 ml-3 mr-2 hidden sm:inline">Fin</label>
+                    <input
+                      type="datetime-local"
+                      min={nowLocalMin()}
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-gray-200 w-full min-w-0 box-border pr-10"
+                    />
+                  </div>
+
+                  <div className="w-full sm:w-auto flex justify-end">
+                    <button onClick={addTask} className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 text-white" aria-label="Ajouter une tâche">
+                      <span className="hidden sm:inline-flex"><FiPlus /></span>
+                      <span>Ajouter</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="space-y-3">
-              {tasks.length === 0 && (
-                <div className="p-12 rounded-2xl bg-white/60 backdrop-blur-xl border-2 border-dashed border-gray-300 text-center">
-                  <div className="text-4xl mb-3">📝</div>
-                  <div className="font-semibold text-gray-700">Aucune tâche</div>
-                  <div className="text-sm text-gray-500 mt-1">Ajoute ta première tâche ci-dessus</div>
-                </div>
-              )}
-              {tasks.map((t) => {
+              {tasks.length === 0 && <div className="p-6 rounded-2xl bg-gray-50 text-center">Aucune tâche</div>}
+              {tasks.map((t: any) => {
                 const tid = t._id || t.id;
-                const isEditing = String(editingTaskId) === String(tid);
+                const status = computeStatusFromDates(t.startDate, t.endDate);
+                const badgeColor = status === "En cours" ? "green" : status === "Terminée" ? "gray" : "yellow";
                 return (
-                  <div key={tid} className="p-4 sm:p-5 rounded-2xl bg-white/80 backdrop-blur-xl shadow-lg border border-white/20 hover:shadow-xl transition-all">
-                    <div className="flex flex-col lg:flex-row gap-4">
-                      <div className="flex-1 min-w-0">
-                        {isEditing ? (
-                          <div className="space-y-3">
-                            <input className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-                            <input className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
-                            <input type="date" min={todayIso()} className="w-full px-3 py-2 rounded-xl border-2 border-gray-200 focus:border-indigo-500 outline-none" value={editDeadline} onChange={(e) => setEditDeadline(e.target.value)} />
-                          </div>
-                        ) : (
-                          <>
-                            <div className="font-bold text-lg text-gray-900">{t.title}</div>
-                            <div className="text-sm text-gray-600 mt-1">{t.description}</div>
-                            {t.deadline && (
-                              <div className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mt-2">
-                                <span>📅</span>
-                                <span>{new Date(t.deadline).toLocaleDateString()}</span>
-                              </div>
-                            )}
-                          </>
-                        )}
+                  <div key={tid} className="p-4 rounded-2xl bg-white shadow-sm border border-gray-50 flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-lg truncate">{t.title}</div>
+                      <div className="text-sm text-gray-600 mt-1 truncate">{t.description}</div>
+                      <div className="flex items-center gap-3 mt-3 text-xs text-gray-500 flex-wrap">
+                        <div className="flex items-center gap-1"><FiClock /> Début: {t.startDate ? new Date(t.startDate).toLocaleString() : "—"}</div>
+                        <div className="flex items-center gap-1"><FiCalendar /> Fin: {t.endDate ? new Date(t.endDate).toLocaleString() : "—"}</div>
+                        <div><Badge color={badgeColor as any}>{status}</Badge></div>
                       </div>
+                    </div>
 
-                      <div className="flex lg:flex-col gap-2 justify-end lg:justify-start">
-                        {isEditing ? (
-                          <>
-                            <Button onClick={saveEdit}>💾 Sauver</Button>
-                            <Button variant="ghost" onClick={() => setEditingTaskId(null)}>❌ Annuler</Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button onClick={() => startEdit(t)} variant="ghost">✏️ Modifier</Button>
-                            <Button onClick={() => deleteTask(tid)} variant="danger">🗑</Button>
-                          </>
-                        )}
-                      </div>
+                    <div className="flex flex-col gap-2 ml-4">
+                      {String(editingTaskId) === String(tid) ? (
+                        <>
+                          <button onClick={saveEdit} className="px-3 py-2 rounded-lg bg-emerald-600 text-white">Enregistrer</button>
+                          <button onClick={() => setEditingTaskId(null)} className="px-3 py-2 rounded-lg border">Annuler</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => startEdit(t)} className="p-2 rounded-lg bg-white border"><FiEdit2 /></button>
+                          <button onClick={() => deleteTask(tid)} className="p-2 rounded-lg bg-red-50 text-red-600"><FiTrash2 /></button>
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -684,35 +959,45 @@ function GroupPage() {
             </div>
           </div>
 
-          <aside className="bg-white/80 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-white/20 h-fit sticky top-6">
-            <h4 className="font-bold text-lg mb-4 flex items-center gap-2">
-              <span>👥</span>
-              <span>Membres</span>
-            </h4>
+          <aside className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-50">
+            <h4 className="font-semibold text-lg mb-3">Membres</h4>
             <div className="space-y-3">
               {(group?.members || []).map((m: any) => {
                 const memberId = typeof m === "string" ? m : (m._id || m.id || m);
-                const isSelf = String(memberId) === String(userId);
+                const isSelf = String(memberId) === String(getUserIdFromToken());
+                const isOwnerMember = String(memberId) === String(group?.owner?._id || group?.owner);
                 return (
-                  <div key={String(memberId)} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                        {(m.fullname || String(memberId))[0].toUpperCase()}
-                      </div>
-                      <div className="text-sm font-medium truncate">{m.fullname || String(memberId).slice(0, 8)}</div>
+                  <div key={String(memberId)} className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-md bg-emerald-200 text-emerald-700 flex items-center justify-center font-semibold">{(m.fullname || String(memberId))[0]?.toUpperCase()}</div>
+                      <div className="text-sm font-medium truncate">{m.fullname || String(memberId).slice(0,8)}</div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {isSelf && <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">Moi</span>}
-                      {isOwner && !isSelf && <button onClick={() => removeMember(memberId)} className="text-xs font-medium text-red-500 hover:text-red-700 transition-colors">Retirer</button>}
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-gray-500">
+                        {isSelf ? <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">Moi</span> : null}
+                        {isOwnerMember && !isSelf ? <span className="ml-2 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">Propriétaire</span> : null}
+                      </div>
+
+                      {isOwner && !isOwnerMember && !isSelf && (
+                        <button onClick={() => removeMember(String(memberId))} title="Retirer du groupe" className="px-2 py-1 rounded-lg bg-red-50 text-red-600 text-xs">Supprimer</button>
+                      )}
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="mt-6 pt-6 border-t border-gray-200">
+            <div className="mt-6">
               <div className="text-sm font-medium text-gray-700 mb-2">Code d'invitation</div>
-              <code className="block px-4 py-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl text-center font-mono font-bold text-indigo-600">{group?.inviteCode || "—"}</code>
+
+              <button
+                onClick={copyInviteCode}
+                className="block w-full text-left px-4 py-3 bg-emerald-50 rounded-xl text-center font-mono font-semibold text-emerald-700 hover:brightness-95"
+                title="Cliquer pour copier le code"
+              >
+                {group?.inviteCode || "—"}
+              </button>
+
               <p className="text-xs text-gray-500 mt-2 text-center">Partage ce code pour inviter des membres</p>
             </div>
           </aside>
@@ -722,18 +1007,102 @@ function GroupPage() {
   );
 }
 
-/* =======================================================
-   PrivateRoute & Exported App (wrap with AlertsProvider)
-   ======================================================= */
+/* ==========================
+   Profile Drawer (global)
+   ========================== */
+
+function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [user, setUser] = useState<any>(null);
+  const nav = useNavigate();
+  const alerts = useAlerts();
+
+  useEffect(() => {
+    if (open) fetchMe();
+  }, [open]);
+
+  async function fetchMe() {
+    try {
+      const res = await api.get("/auth/me");
+      setUser(res.data);
+    } catch (err: any) {
+      if (err?.response?.status === 401) { localStorage.removeItem("token"); nav("/"); return; }
+      alerts.showToast({ type: "error", message: "Impossible de lire le profil" });
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem("token");
+    onClose();
+    nav("/");
+  }
+
+  async function deleteAccount() {
+    const ok = await alerts.confirm({ title: "Supprimer le compte", message: "Es-tu sûr de vouloir supprimer ton compte ? Cette action est irréversible.", okLabel: "Supprimer", cancelLabel: "Annuler" });
+    if (!ok) return;
+    try {
+      await api.delete("/auth/me");
+      alerts.showToast({ type: "success", message: "Compte supprimé" });
+      localStorage.removeItem("token");
+      onClose();
+      nav("/");
+    } catch (err: any) {
+      try {
+        const uid = getUserIdFromToken();
+        if (uid) {
+          await api.delete(`/users/${uid}`);
+          alerts.showToast({ type: "success", message: "Compte supprimé" });
+          localStorage.removeItem("token");
+          onClose();
+          nav("/");
+          return;
+        }
+      } catch {}
+      alerts.showToast({ type: "error", message: err?.response?.data?.message || "Erreur suppression compte" });
+    }
+  }
+
+  return (
+    <div className={`fixed inset-0 z-70 transition-transform ${open ? "pointer-events-auto" : "pointer-events-none"}`}>
+      <div onClick={onClose} className={`absolute inset-0 bg-black/30 ${open ? "opacity-100" : "opacity-0"} transition-opacity`}></div>
+      <div className={`absolute right-0 top-0 h-full w-full sm:w-96 bg-white shadow-2xl p-4 sm:p-6 transform transition-transform ${open ? "translate-x-0" : "translate-x-full"}`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold">TU</div>
+            <div>
+              <div className="text-lg font-semibold">{user?.fullname || "Utilisateur"}</div>
+              <div className="text-xs text-gray-500">Membre depuis {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400">✕</button>
+        </div>
+
+        <div className="mb-6">
+          <div className="text-sm text-gray-600 mb-2">Informations</div>
+          <div className="text-sm"><span className="font-medium">Nom complet:</span> {user?.fullname}</div>
+          <div className="text-sm mt-2"><span className="font-medium">Email:</span> {user?.email || "—"}</div>
+        </div>
+
+        <div className="space-y-3">
+          <button onClick={logout} className="w-full px-4 py-3 rounded-xl bg-red-500 text-white flex items-center justify-center gap-2"><FiLogOut /> Déconnexion</button>
+          <button onClick={deleteAccount} className="w-full px-4 py-3 rounded-xl bg-transparent border border-red-200 text-red-600">Supprimer mon compte</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ==========================
+   PrivateRoute & App
+   ========================== */
 
 function PrivateRoute({ children }: { children: any }) {
   const token = localStorage.getItem("token");
   if (!token) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-      <div className="bg-white/80 backdrop-blur-xl p-8 rounded-2xl shadow-2xl border border-white/20 text-center">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-white">
+      <div className="bg-white p-8 rounded-2xl shadow-xl text-center">
         <div className="text-4xl mb-4">🔒</div>
         <div className="mb-4 font-semibold text-gray-900">Vous devez être connecté</div>
-        <Link to="/" className="text-indigo-600 hover:text-purple-600 font-medium transition-colors">Se connecter</Link>
+        <Link to="/" className="text-emerald-600 font-medium">Se connecter</Link>
       </div>
     </div>
   );
@@ -741,14 +1110,27 @@ function PrivateRoute({ children }: { children: any }) {
 }
 
 export default function App() {
+  const [profileOpen, setProfileOpen] = useState(false);
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    localStorage.removeItem("token");
+    navigate("/");
+  }
+
   return (
     <AlertsProvider>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-        <Route path="/groups/:id" element={<PrivateRoute><GroupPage /></PrivateRoute>} />
-      </Routes>
+      <ProfileContext.Provider value={{ open: () => setProfileOpen(true) }}>
+        <div className="min-h-screen w-full">
+          <ProfileDrawer open={profileOpen} onClose={() => setProfileOpen(false)} />
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+            <Route path="/groups/:id" element={<PrivateRoute><GroupPage /></PrivateRoute>} />
+          </Routes>
+        </div>
+      </ProfileContext.Provider>
     </AlertsProvider>
   );
 }
