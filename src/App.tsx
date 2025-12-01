@@ -1124,7 +1124,6 @@ function PrivateRoute({ children }: { children: any }) {
 
 export default function App() {
   const [profileOpen, setProfileOpen] = useState(false);
-  const navigate = useNavigate();
 
   // On load: if token exists in localStorage, inject it to axios defaults
   useEffect(() => {
