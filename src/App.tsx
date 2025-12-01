@@ -1,5 +1,6 @@
 // src/App.tsx
-import React, { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Routes, Route, Link, useNavigate, useParams, Navigate } from "react-router-dom";
 import { FiLogOut, FiUser, FiPlus, FiCalendar, FiEdit2, FiTrash2, FiClock } from "react-icons/fi";
 import { HiOutlineUsers } from "react-icons/hi";
@@ -1133,11 +1134,6 @@ export default function App() {
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
     }
   }, []);
-
-  function handleLogout() {
-    localStorage.removeItem("token");
-    navigate("/");
-  }
 
   return (
     <AlertsProvider>
