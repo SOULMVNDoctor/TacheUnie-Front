@@ -633,24 +633,34 @@ function PersonalTasksBlock() {
           />
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="flex items-center gap-2 w-full sm:max-w-[640px]">
-            <label className="text-xs text-gray-600 mr-2 hidden sm:inline">Début</label>
-            <input
-              type="datetime-local"
-              min={nowLocalMin()}
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-gray-200 w-full min-w-0 box-border pr-10"
-            />
-            <label className="text-xs text-gray-600 ml-3 mr-2 hidden sm:inline">Fin</label>
-            <input
-              type="datetime-local"
-              min={nowLocalMin()}
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-gray-200 w-full min-w-0 box-border pr-10"
-            />
+        {/* Updated responsive block: labels visible on mobile & stacked */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:max-w-[640px]">
+            {/* Début */}
+            <div className="w-full sm:w-auto flex items-center gap-2">
+              <label className="text-xs text-gray-600 mr-2">Début</label>
+              <input
+                type="datetime-local"
+                min={nowLocalMin()}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                placeholder="Début"
+                className="px-3 py-2 rounded-xl border border-gray-200 w-full min-w-0 box-border pr-10"
+              />
+            </div>
+
+            {/* Fin */}
+            <div className="w-full sm:w-auto flex items-center gap-2">
+              <label className="text-xs text-gray-600 ml-0 sm:ml-3 mr-2">Fin</label>
+              <input
+                type="datetime-local"
+                min={nowLocalMin()}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                placeholder="Fin"
+                className="px-3 py-2 rounded-xl border border-gray-200 w-full min-w-0 box-border pr-10"
+              />
+            </div>
           </div>
 
           <div className="w-full sm:w-auto flex justify-end">
@@ -912,25 +922,32 @@ function GroupPage() {
                   />
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                  <div className="flex items-center gap-2 w-full sm:max-w-[640px]">
-                    <label className="text-xs text-gray-600 mr-2 hidden sm:inline">Début</label>
-                    <input
-                      type="datetime-local"
-                      min={nowLocalMin()}
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="px-3 py-2 rounded-xl border border-gray-200 w-full min-w-0 box-border pr-10"
-                    />
+                {/* Updated responsive block in GroupPage */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:max-w-[640px]">
+                    <div className="w-full sm:w-auto flex items-center gap-2">
+                      <label className="text-xs text-gray-600 mr-2">Début</label>
+                      <input
+                        type="datetime-local"
+                        min={nowLocalMin()}
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        placeholder="Début"
+                        className="px-3 py-2 rounded-xl border border-gray-200 w-full min-w-0 box-border pr-10"
+                      />
+                    </div>
 
-                    <label className="text-xs text-gray-600 ml-3 mr-2 hidden sm:inline">Fin</label>
-                    <input
-                      type="datetime-local"
-                      min={nowLocalMin()}
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="px-3 py-2 rounded-xl border border-gray-200 w-full min-w-0 box-border pr-10"
-                    />
+                    <div className="w-full sm:w-auto flex items-center gap-2">
+                      <label className="text-xs text-gray-600 ml-0 sm:ml-3 mr-2">Fin</label>
+                      <input
+                        type="datetime-local"
+                        min={nowLocalMin()}
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        placeholder="Fin"
+                        className="px-3 py-2 rounded-xl border border-gray-200 w-full min-w-0 box-border pr-10"
+                      />
+                    </div>
                   </div>
 
                   <div className="w-full sm:w-auto flex justify-end">
