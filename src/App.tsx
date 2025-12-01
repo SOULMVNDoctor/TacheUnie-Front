@@ -1,6 +1,6 @@
 // src/App.tsx
 import React, { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
-import { Routes, Route, Link, useNavigate, useParams } from "react-router-dom";
+import { Routes, Route, Link, useNavigate, useParams, Navigate } from "react-router-dom";
 import { FiLogOut, FiUser, FiPlus, FiCalendar, FiEdit2, FiTrash2, FiClock } from "react-icons/fi";
 import { HiOutlineUsers } from "react-icons/hi";
 import api from "./lib/api";
@@ -278,7 +278,12 @@ function Login() {
     e.preventDefault();
     try {
       const res = await api.post("/auth/login", { fullname, password });
-      localStorage.setItem("token", res.data.token);
+      const token = res.data.token ?? res.data.accessToken;
+      if (token) {
+        localStorage.setItem("token", token);
+        api.defaults.headers.common = api.defaults.headers.common || {};
+        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      }
       alerts.showToast({ type: "success", title: "Connecté", message: "Bienvenue !", timeout: 2000 });
       nav("/dashboard");
     } catch (err: any) {
@@ -322,7 +327,22 @@ function Register() {
   async function submit(e: any) {
     e.preventDefault();
     try {
-      await api.post("/auth/register", { fullname, password });
+      const res = await api.post("/auth/register", { fullname, password });
+
+      // si backend renvoie token (recommandé), on le stocke et on redirige directement vers le dashboard
+      const token = res.data.token ?? res.data.accessToken;
+      const user = res.data.user ?? null;
+      if (token) {
+        localStorage.setItem("token", token);
+        if (user) localStorage.setItem("user", JSON.stringify(user));
+        api.defaults.headers.common = api.defaults.headers.common || {};
+        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+        alerts.showToast({ type: "success", title: "Compte créé", message: "Bienvenue !", timeout: 1500 });
+        nav("/dashboard");
+        return;
+      }
+
+      // fallback si pas de token renvoyé : afficher message et rediriger vers login
       alerts.showToast({ type: "success", title: "Compte créé", message: "Tu peux maintenant te connecter", timeout: 3000 });
       setTimeout(() => nav("/"), 700);
     } catch (err: any) {
@@ -1097,21 +1117,22 @@ function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }
 
 function PrivateRoute({ children }: { children: any }) {
   const token = localStorage.getItem("token");
-  if (!token) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-white">
-      <div className="bg-white p-8 rounded-2xl shadow-xl text-center">
-        <div className="text-4xl mb-4">🔒</div>
-        <div className="mb-4 font-semibold text-gray-900">Vous devez être connecté</div>
-        <Link to="/" className="text-emerald-600 font-medium">Se connecter</Link>
-      </div>
-    </div>
-  );
+  if (!token) return <Navigate to="/" replace />;
   return children;
 }
 
 export default function App() {
   const [profileOpen, setProfileOpen] = useState(false);
   const navigate = useNavigate();
+
+  // On load: if token exists in localStorage, inject it to axios defaults
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      api.defaults.headers.common = api.defaults.headers.common || {};
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    }
+  }, []);
 
   function handleLogout() {
     localStorage.removeItem("token");
@@ -1124,8 +1145,9 @@ export default function App() {
         <div className="min-h-screen w-full">
           <ProfileDrawer open={profileOpen} onClose={() => setProfileOpen(false)} />
           <Routes>
-            <Route path="/" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            {/* If user already logged in, redirect to dashboard */}
+            <Route path="/" element={localStorage.getItem("token") ? <Navigate to="/dashboard" replace /> : <Login />} />
+            <Route path="/register" element={localStorage.getItem("token") ? <Navigate to="/dashboard" replace /> : <Register />} />
             <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
             <Route path="/groups/:id" element={<PrivateRoute><GroupPage /></PrivateRoute>} />
           </Routes>
